@@ -1,0 +1,203 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Monitoreo de Estanques</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #e0f7fa, #e8f5e9);
+            color: #222;
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #00695c;
+        }
+        .logo-container img {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+        .form-section, .chart-section, .service-section, .history-section {
+            background: white;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        input[type="number"], select, input[type="date"] {
+            padding: 5px;
+            margin: 3px;
+        }
+        button {
+            padding: 10px;
+            background: #00796b;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #004d40;
+        }
+        canvas {
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="logo-container">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Logo_Ejemplo.svg/2560px-Logo_Ejemplo.svg.png" alt="Logo Empresa">
+</div>
+
+<h1>Monitoreo Diario de Estanques</h1>
+
+<div class="form-section">
+    <label>Fecha: <input type="date" id="fecha" /></label><br><br>
+
+    <h2>Porcentaje de Llenado</h2>
+    <div id="estanques">
+        <label>TK6000: <input type="number" id="TK6000" min="0" max="100">%</label><br>
+        <label>TK1000: <input type="number" id="TK1000" min="0" max="100">%</label><br>
+        <label>Potable 2200 ME: <input type="number" id="Potable2200ME" min="0" max="100">%</label><br>
+        <label>Potable 1.5 CS: <input type="number" id="Potable15CS" min="0" max="100">%</label><br>
+        <label>TK 1.5 NPT2: <input type="number" id="TK15NPT2" min="0" max="100">%</label><br>
+        <label>TK-2 RVergara: <input type="number" id="TK2RVergara" min="0" max="100">%</label><br>
+    </div>
+
+    <h2>Estado de Bombas</h2>
+    <div id="bombas">
+        <label>Rio CS 2: <select id="RioCS2"><option>Detenida</option><option>En servicio</option></select></label><br>
+        <label>Rio Coya Sur 3: <select id="RioCoyaSur3"><option>Detenida</option><option>En servicio</option></select></label><br>
+        <label>Booster 201: <select id="Booster201"><option>Detenida</option><option>En servicio</option></select></label><br>
+        <label>Booster 202: <select id="Booster202"><option>Detenida</option><option>En servicio</option></select></label><br>
+        <label>Recinto Vergara 1: <select id="RecintoVergara1"><option>Detenida</option><option>En servicio</option></select></label><br>
+        <label>Recinto Vergara 2: <select id="RecintoVergara2"><option>Detenida</option><option>En servicio</option></select></label><br>
+        <label>Recinto Vergara 3: <select id="RecintoVergara3"><option>Detenida</option><option>En servicio</option></select></label><br>
+        <label>Coya Vergara 1: <select id="CoyaVergara1"><option>Detenida</option><option>En servicio</option></select></label><br>
+        <label>Coya Vergara 2: <select id="CoyaVergara2"><option>Detenida</option><option>En servicio</option></select></label><br>
+        <label>Coya Vergara 3: <select id="CoyaVergara3"><option>Detenida</option><option>En servicio</option></select></label><br>
+        <label>Coya Vergara 4: <select id="CoyaVergara4"><option>Detenida</option><option>En servicio</option></select></label><br>
+    </div><br>
+
+    <button onclick="guardarDatos()">Guardar Datos</button>
+    <button onclick="exportar()">Exportar Datos</button>
+    <input type="file" accept=".json" onchange="importar(event)" />
+</div>
+
+<div class="chart-section">
+    <h2>Gráfico de Tendencias</h2>
+    <canvas id="tendencias" width="600" height="300"></canvas>
+</div>
+
+<div class="service-section">
+    <h2>Bombas en Servicio</h2>
+    <ul id="listaBombas"></ul>
+</div>
+
+<div class="history-section">
+    <h2>Historial</h2>
+    <label>Desde: <input type="date" id="desde" /></label>
+    <label>Hasta: <input type="date" id="hasta" /></label>
+    <button onclick="filtrar()">Consultar</button>
+    <pre id="historial"></pre>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let datos = JSON.parse(localStorage.getItem("estanques")) || [];
+
+function guardarDatos() {
+    const fecha = document.getElementById("fecha").value;
+    if (!fecha) return alert("Ingrese una fecha");
+
+    const entrada = {
+        fecha,
+        estanques: {
+            TK6000: +document.getElementById("TK6000").value || 0,
+            TK1000: +document.getElementById("TK1000").value || 0,
+            Potable2200ME: +document.getElementById("Potable2200ME").value || 0,
+            Potable15CS: +document.getElementById("Potable15CS").value || 0,
+            TK15NPT2: +document.getElementById("TK15NPT2").value || 0,
+            TK2RVergara: +document.getElementById("TK2RVergara").value || 0
+        },
+        bombas: {}
+    };
+
+    const bombas = document.querySelectorAll("#bombas select");
+    bombas.forEach(b => entrada.bombas[b.id] = b.value);
+
+    datos.push(entrada);
+    localStorage.setItem("estanques", JSON.stringify(datos));
+    alert("Datos guardados correctamente");
+    actualizarBombas();
+    dibujarGrafico();
+}
+
+function actualizarBombas() {
+    const ult = datos[datos.length - 1];
+    const lista = document.getElementById("listaBombas");
+    lista.innerHTML = "";
+    if (ult && ult.bombas) {
+        Object.entries(ult.bombas).forEach(([nombre, estado]) => {
+            if (estado === "En servicio") {
+                const li = document.createElement("li");
+                li.textContent = nombre;
+                lista.appendChild(li);
+            }
+        });
+    }
+}
+
+function dibujarGrafico() {
+    const ctx = document.getElementById("tendencias").getContext("2d");
+    const fechas = datos.map(d => d.fecha);
+    const series = Object.keys(datos[0]?.estanques || {});
+    const datasets = series.map(serie => ({
+        label: serie,
+        data: datos.map(d => d.estanques[serie]),
+        fill: false,
+        borderColor: '#' + Math.floor(Math.random()*16777215).toString(16)
+    }));
+
+    new Chart(ctx, {
+        type: 'line',
+        data: { labels: fechas, datasets },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+}
+
+function exportar() {
+    const blob = new Blob([JSON.stringify(datos)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "datos_estanques.json";
+    a.click();
+}
+
+function importar(e) {
+    const reader = new FileReader();
+    reader.onload = () => {
+        datos = JSON.parse(reader.result);
+        localStorage.setItem("estanques", JSON.stringify(datos));
+        alert("Datos importados");
+        dibujarGrafico();
+        actualizarBombas();
+    };
+    reader.readAsText(e.target.files[0]);
+}
+
+function filtrar() {
+    const desde = document.getElementById("desde").value;
+    const hasta = document.getElementById("hasta").value;
+    const filtrado = datos.filter(d => (!desde || d.fecha >= desde) && (!hasta || d.fecha <= hasta));
+    document.getElementById("historial").textContent = JSON.stringify(filtrado, null, 2);
+}
+
+dibujarGrafico();
+actualizarBombas();
+</script>
+</body>
+</html>
